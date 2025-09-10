@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 console.log("Module loaded");
 // Connect to your Neon DB
-const sql = postgres(process.env.DATABASE_URL!, { ssl: 'require' }); // make sure DATABASE_URL is in .env
+const sql = postgres(process.env.DATABASE_URL!, { ssl: true });
 
 console.log("Connected to db");
 export async function POST(req: NextRequest) {
