@@ -8,6 +8,9 @@ const sql = postgres(process.env.DATABASE_URL!, { ssl: 'require' }); // make sur
 console.log("Connected to db");
 export async function POST(req: NextRequest) {
     console.log("POST called")
+    console.log("Testing DB query");
+    await sql`SELECT 1`;
+    console.log("DB query succeeded");
   try {
     // Parse the JSON body
     const body = await req.json();
