@@ -32,6 +32,8 @@ export default function Login() {
           // Login succeeded
           console.log("Login successful:");
           router.push("/dashboard"); // redirect to protected page
+        }else{
+          setMessage("Login failed");
         }
 
         setLoading(false);
