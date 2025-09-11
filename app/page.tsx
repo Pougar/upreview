@@ -3,30 +3,43 @@ import Link from 'next/link';
 
 export default function Home() {
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="bg-gray-200 dark:bg-gray-700 rounded-lg p-6 flex flex-col items-center gap-4 w-100 mx-auto">
-        <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-          <h1 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
-            Welcome to Review Remind - Increasing Positive Google Reviews for you business
-          </h1>
-          <div className="flex gap-4 items-center flex-col sm:flex-row">
-            <Link
-              className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-              href="/log-in"
-              target="_self"
-            >
-              Log In
-            </Link>
-            <Link
-              className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-              href="/sign-up"
-              target="_self"
-            >
-              Sign Up
-            </Link>
-          </div>
-        </main>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-100 via-blue-100 to-pink-100 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-10 flex flex-col items-center gap-8 w-full max-w-lg text-center">
+        
+        {/* Logo Placeholder */}
+        <div className="w-32 h-32">
+          <img 
+            src="/snakepic.png" 
+            alt="Review Remind Logo" 
+            className="w-full h-full object-contain"
+          />
+        </div>
+
+        {/* Heading */}
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
+          Welcome to Review Remind
+        </h1>
+        <p className="text-gray-600 sm:text-lg">
+          Increase positive Google reviews for your business effortlessly
+        </p>
+
+        {/* Buttons */}
+        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+          <Link
+            href="/log-in"
+            className="w-full sm:w-auto bg-blue-500 text-white rounded-full px-6 py-3 font-medium hover:bg-blue-600 transition"
+          >
+            Log In
+          </Link>
+          <Link
+            href="/sign-up"
+            className="w-full sm:w-auto border border-gray-300 rounded-full px-6 py-3 font-medium hover:bg-gray-100 transition"
+          >
+            Sign Up
+          </Link>
+        </div>
       </div>
     </div>
+
   );
 }
