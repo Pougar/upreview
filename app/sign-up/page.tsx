@@ -36,14 +36,14 @@ export default function SignUpPage() {
             },
             onSuccess: async (ctx) => {
                 //redirect to the dashboard or sign in page
-                if (data?.user) {
+                if (ctx.data?.id) {
                     await fetch("/api/sign-up", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
-                        id: data.user.id,
-                        name: data.user.name,
-                        email: data.user.email
+                        id: ctx.data.user.id,
+                        name: ctx.data.user.name,
+                        email: ctx.data.user.email
                         }),
                     });
                 }
