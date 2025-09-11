@@ -1,10 +1,12 @@
 import { betterAuth } from "better-auth";
-import postgres from "postgres";
+import { Pool } from "pg";
 
-const sql = postgres(process.env.DATABASE_URL!, { ssl: 'require' });
-
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: true }, // adjust if your DB requires strict SSL
+});
 export const auth = betterAuth({
-    database: sql,
+    database: pool,
     emailAndPassword: {
         enabled: true, 
     }

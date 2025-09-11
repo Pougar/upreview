@@ -1,17 +1,17 @@
-import postgres from "postgres";
+import { Pool } from "pg";
 import { NextRequest, NextResponse } from "next/server";
 
 console.log("Module loaded");
 // Connect to your Neon DB
 
-const sql = postgres(process.env.DATABASE_URL!,  { ssl: 'verify-full' });
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: true }, // equivalent to 'verify-full'
+});
 
 console.log("Connected to db");
 export async function POST(req: NextRequest) {
     console.log("POST called")
-    console.log("Testing DB query");
-    await sql`SELECT 1`;
-    console.log("DB query succeeded");
   try {
     // Parse the JSON body
     const body = await req.json();
@@ -22,14 +22,15 @@ export async function POST(req: NextRequest) {
     }
 
     // Insert into your database (no passwords)
-    const result = await sql`
-      INSERT INTO users (betterauth_id, name, email)
-      VALUES (${id}, ${name}, ${email})
-      ON CONFLICT (betterauth_id) DO NOTHING
-      RETURNING *
-    `;
+    const result = await pool.query(
+      `INSERT INTO users (betterauth_id, name, email)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (betterauth_id) DO NOTHING
+       RETURNING *`,
+      [id, name, email]
+    );
 
-    if (result.length === 0) {
+    if (result.rows.length === 0) {
       // Conflict occurred, user already exists
       return NextResponse.json({ error: "User already exists" }, { status: 409 });
     }
