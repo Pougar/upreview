@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { authClient } from "@/app/lib/auth-client";
+import Link from "next/link";
 
 type ReviewCounts = {
     good: number;
@@ -50,19 +51,28 @@ export default function Stats() {
     
 
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center space-y-6">
-        <h1 className="text-2xl font-bold mb-6">Client Reviews</h1>
-        <div className="flex space-x-6">
-            <button className="px-6 py-3 border-2 border-green-500 text-green-500 rounded-xl hover:bg-green-50 transition">
-            Good: {counts?.good}
-            </button>
-            <button className="px-6 py-3 border-2 border-red-500 text-red-500 rounded-xl hover:bg-red-50 transition">
-            Bad: {counts?.bad}
-            </button>
-            <button className="px-6 py-3 border-2 border-gray-500 text-gray-500 rounded-xl hover:bg-gray-50 transition">
-            Not Reviewed Yet: {counts?.not_reviewed_yet}
-            </button>
-        </div>
+    <div className="min-h-screen flex flex-col items-center justify-center space-y-6">
+      <h1 className="text-2xl font-bold mb-6">Client Reviews</h1>
+      <div className="flex space-x-6">
+        <Link
+          href="/statistics"
+          className="px-6 py-3 border-2 border-green-500 text-green-500 rounded-xl hover:bg-green-50 transition"
+        >
+          Good: {counts?.good}
+        </Link>
+        <Link
+          href="/statistics/bad-reviews"
+          className="px-6 py-3 border-2 border-red-500 text-red-500 rounded-xl hover:bg-red-50 transition"
+        >
+          Bad: {counts?.bad}
+        </Link>
+        <Link
+          href="/statistics"
+          className="px-6 py-3 border-2 border-gray-500 text-gray-500 rounded-xl hover:bg-gray-50 transition"
+        >
+          Not Reviewed Yet: {counts?.not_reviewed_yet}
+        </Link>
+      </div>
     </div>
     );
   }
