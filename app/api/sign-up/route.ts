@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
 
     // Insert into your database (no passwords)
     const result = await pool.query(
-      `INSERT INTO users (betterauth_id, name, email)
+      `INSERT INTO myusers (betterauth_id, name, email)
        VALUES ($1, $2, $3)
        ON CONFLICT (betterauth_id) DO NOTHING
        RETURNING *`,
