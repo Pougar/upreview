@@ -57,9 +57,12 @@ export default function Service() {
             </div>
 
             {/* Complete Payment Button */}
-            <button className="bg-blue-500 text-white px-6 py-3 rounded-full font-semibold hover:bg-blue-600 transition mt-6 w-full">
+            <Link
+            href="/dashboard"
+            className="bg-blue-500 text-white px-6 py-3 rounded-full font-semibold hover:bg-blue-600 transition mt-6 w-full text-center inline-block"
+            >
             Complete Payment
-            </button>
+            </Link>
 
         </div>
         </div>

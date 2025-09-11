@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { authClient } from "@/app/lib/auth-client";
 import Link from "next/link";
+import Image from "next/image";
+
 
 type ReviewCounts = {
     good: number;
@@ -51,29 +53,48 @@ export default function Stats() {
     
 
     return (
-    <div className="min-h-screen flex flex-col items-center justify-center space-y-6">
-      <h1 className="text-2xl font-bold mb-6">Client Reviews</h1>
-      <div className="flex space-x-6">
-        <Link
-          href="/dashboard/statistics"
-          className="px-6 py-3 border-2 border-green-500 text-green-500 rounded-xl hover:bg-green-50 transition"
-        >
-          Good: {counts?.good}
-        </Link>
-        <Link
-          href="/dashboard/statistics/bad-reviews"
-          className="px-6 py-3 border-2 border-red-500 text-red-500 rounded-xl hover:bg-red-50 transition"
-        >
-          Bad: {counts?.bad}
-        </Link>
-        <Link
-          href="/dashboard/statistics"
-          className="px-6 py-3 border-2 border-gray-500 text-gray-500 rounded-xl hover:bg-gray-50 transition"
-        >
-          Not Reviewed Yet: {counts?.not_reviewed_yet}
-        </Link>
-      </div>
-    </div>
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-6 flex flex-col items-center gap-10">
+        <h1 className="text-3xl font-bold text-gray-800 text-center">Review Dashboard</h1>
+        <p className="text-gray-600 text-center max-w-xl">
+            Track your reviews and see how your business is performing.
+        </p>
+
+        {/* Buttons Section */}
+        <div className="flex flex-col sm:flex-row gap-6 w-full justify-center">
+            
+            {/* Good Reviews Button */}
+            <button className="bg-green-500 text-white rounded-2xl p-8 flex flex-col items-center justify-center gap-4 hover:bg-green-600 transition w-72 h-72 shadow-2xl">
+            <h2 className="text-xl font-bold">Good Reviews</h2>
+            <p className="text-gray-100">Click to see details</p>
+            {/* Placeholder for graph */}
+            <div className="bg-white w-40 h-40 rounded-lg flex items-center justify-center">
+                <span className="text-gray-400">Graph Here</span>
+            </div>
+            </button>
+
+            {/* Average Reviews Button */}
+            <button className="bg-yellow-400 text-white rounded-2xl p-8 flex flex-col items-center justify-center gap-4 hover:bg-yellow-500 transition w-72 h-72 shadow-2xl">
+            <h2 className="text-xl font-bold">Average Reviews</h2>
+            <p className="text-gray-100">Click to see details</p>
+            {/* Optional placeholder */}
+            <div className="bg-white w-40 h-40 rounded-lg flex items-center justify-center">
+                <Image src="/goodgraph.png" alt="Average Reviews Graph" width={100} height={100} className="text-gray-400" />
+            </div>
+            </button>
+
+            {/* Poor Reviews Button */}
+            <button className="bg-red-500 text-white rounded-2xl p-8 flex flex-col items-center justify-center gap-4 hover:bg-red-600 transition w-72 h-72 shadow-2xl">
+            <h2 className="text-xl font-bold">Poor Reviews</h2>
+            <p className="text-gray-100">Click to see details</p>
+            {/* Optional placeholder */}
+            <div className="bg-white w-40 h-40 rounded-lg flex items-center justify-center">
+                <span className="text-gray-400">Graph Here</span>
+            </div>
+            </button>
+
+        </div>
+        </div>
+
     );
   }
   

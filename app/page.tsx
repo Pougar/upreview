@@ -1,5 +1,7 @@
 
 import Link from 'next/link';
+import Image from "next/image";
+
 
 export default function Home() {
   return (
@@ -8,11 +10,14 @@ export default function Home() {
         
         {/* Logo Placeholder */}
         <div className="w-32 h-32">
-          <img 
-            src="/snakepic.png" 
-            alt="Review Remind Logo" 
-            className="w-full h-full object-contain"
-          />
+
+        <Image
+          src="/snakepic.png"
+          alt="Review Remind Logo"
+          width={150}      // set desired width
+          height={150}     // set desired height
+          className="object-contain"
+        />
         </div>
 
         {/* Heading */}
