@@ -10,6 +10,7 @@ const links = [
   { name: 'Home', href: '/dashboard'},
   {name: 'Statistics',href: '/dashboard/statistics'},
   { name: 'Service', href: '/dashboard/service'},
+  {name: 'Settings', href: '/settings' }
 ];
 
 export default function NavLinks() {

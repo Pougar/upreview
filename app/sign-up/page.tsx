@@ -48,7 +48,7 @@ export default function SignUpPage() {
                     });
                 }
                 setLoading(false);
-                router.push("/dashboard");
+                router.push("/payment");
             },
             onError: (ctx) => {
                 // display the error message

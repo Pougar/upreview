@@ -5,7 +5,7 @@ import { authClient } from "@/app/lib/auth-client";
 export async function middleware(req: NextRequest) {
   // List of protected paths
   console.log("middleware called");
-  const protectedPaths = ["/dashboard", "/profile"];
+  const protectedPaths = ["/dashboard", "/settings", "/payment"];
 
   const url = req.nextUrl.clone();
   const isProtected = protectedPaths.some((path) => url.pathname.startsWith(path));

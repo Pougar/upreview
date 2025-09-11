@@ -17,7 +17,7 @@ export default function Home() {
 
         {/* Heading */}
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
-          Welcome to Review Remind
+          Review Remind
         </h1>
         <p className="text-gray-600 sm:text-lg">
           Increase positive Google reviews for your business effortlessly
@@ -32,7 +32,7 @@ export default function Home() {
             Log In
           </Link>
           <Link
-            href="/sign-up"
+            href="/choose-plan"
             className="w-full sm:w-auto border border-gray-300 rounded-full px-6 py-3 font-medium hover:bg-gray-100 transition"
           >
             Sign Up
