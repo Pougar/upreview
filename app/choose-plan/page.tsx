@@ -4,7 +4,7 @@ import Link from "next/link";
 
 export default function ChoosePlan() {
   return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-6 flex flex-col items-center gap-10">
+       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-6 flex flex-col items-center gap-10">
         <h1 className="text-3xl font-bold text-gray-800 text-center">Choose Your Plan</h1>
         <p className="text-gray-600 text-center max-w-xl">
             Select a plan that works for you. After choosing a plan, create your account and start boosting your Google reviews!
@@ -16,7 +16,7 @@ export default function ChoosePlan() {
             {/* Basic Plan */}
             <Link 
             href="/sign-up"
-            className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4 w-72 hover:shadow-3xl transition"
+            className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4 w-72 transform transition-all duration-300 hover:scale-105 hover:border-2 hover:border-black"
             >
             <h2 className="text-xl font-bold text-gray-800">Basic</h2>
             <p className="text-2xl font-semibold text-gray-700">$50 / month</p>
@@ -31,7 +31,7 @@ export default function ChoosePlan() {
             {/* Premium Plan */}
             <Link 
             href="/sign-up"
-            className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4 w-72 hover:shadow-3xl transition"
+            className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4 w-72 transform transition-all duration-300 hover:scale-105 hover:border-2 hover:border-black"
             >
             <h2 className="text-xl font-bold text-gray-800">Premium</h2>
             <p className="text-2xl font-semibold text-gray-700">$150 / month</p>
@@ -46,7 +46,7 @@ export default function ChoosePlan() {
             {/* VIP Plan */}
             <Link 
             href="/sign-up"
-            className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4 w-72 hover:shadow-3xl transition"
+            className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4 w-72 transform transition-all duration-300 hover:scale-105 hover:border-2 hover:border-black"
             >
             <h2 className="text-xl font-bold text-gray-800">VIP</h2>
             <p className="text-2xl font-semibold text-gray-700">$300 / month</p>
@@ -60,6 +60,7 @@ export default function ChoosePlan() {
 
         </div>
         </div>
+
 
   );
 }
