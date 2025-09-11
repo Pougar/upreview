@@ -30,6 +30,7 @@ export default function Login() {
 
         if (data) {
           // Login succeeded
+          console.log("Login successful:");
           router.push("/dashboard"); // redirect to protected page
         }
 
