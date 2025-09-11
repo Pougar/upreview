@@ -14,7 +14,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next(); // allow public paths
   }
 
-  const sessionToken = req.cookies.get("betterauth_session")?.value;
+  const sessionToken = req.cookies.get("__Secure-better-auth.session_token")?.value;
 
   if (!sessionToken) {
     // Not logged in → redirect to login
@@ -28,7 +28,7 @@ export async function middleware(req: NextRequest) {
     const session = await authClient.getSession({
         fetchOptions: {
         headers: {
-        cookie: `betterauth_session=${sessionToken}`
+        cookie: `__Secure-better-auth.session_token=${sessionToken}`
             }
         }
         });
