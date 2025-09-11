@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authClient } from "@/app/lib/auth-client";
 
+
 export async function middleware(req: NextRequest) {
   // List of protected paths
   const protectedPaths = ["/dashboard", "/profile"];
@@ -25,7 +26,7 @@ export async function middleware(req: NextRequest) {
     const session = await authClient.getSession({
         fetchOptions: {
         headers: {
-        Cookie: `betterauth_session=${sessionToken}`
+        cookie: `betterauth_session=${sessionToken}`
             }
         }
         });

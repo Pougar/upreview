@@ -15,6 +15,7 @@ export default function Login() {
 
     const handleLogInSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setMessage("");
         setLoading(true);
         const { data, error } = await authClient.signIn.email({
             email,
