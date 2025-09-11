@@ -4,8 +4,17 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/app/lib/auth-client"; //import the auth client
+import { useEffect } from "react";
 
 export default function Login() {
+
+  const { data: session } = authClient.useSession();
+
+    useEffect(() => {
+    if (session) {
+      router.replace("/dashboard");
+    }
+  });
 
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
