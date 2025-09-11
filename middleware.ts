@@ -24,6 +24,7 @@ export async function middleware(req: NextRequest) {
     // Verify token with BetterAuth
     const session = await authClient.getSession();;
     if (!session) {
+        console.log("No session found");
       url.pathname = "/log-in";
       return NextResponse.redirect(url);
     }
