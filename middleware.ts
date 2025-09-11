@@ -22,7 +22,13 @@ export async function middleware(req: NextRequest) {
 
   try {
     // Verify token with BetterAuth
-    const session = await authClient.getSession();;
+    const session = await authClient.getSession({
+        fetchOptions: {
+        headers: {
+        Cookie: `betterauth_session=${sessionToken}`
+            }
+        }
+        });
     if (!session) {
         console.log("No session found");
       url.pathname = "/log-in";
