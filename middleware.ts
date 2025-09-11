@@ -18,6 +18,7 @@ export async function middleware(req: NextRequest) {
 
   if (!sessionToken) {
     // Not logged in → redirect to login
+    console.log("No session token");
     url.pathname = "/log-in";
     return NextResponse.redirect(url);
   }
@@ -39,6 +40,7 @@ export async function middleware(req: NextRequest) {
     // Valid session → continue
     return NextResponse.next();
   } catch (err) {
+    console.error("Error verifying session:", err);
     url.pathname = "/log-in";
     return NextResponse.redirect(url);
   }
