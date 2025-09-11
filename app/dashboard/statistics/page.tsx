@@ -46,7 +46,7 @@ export default function Stats() {
         fetchCountsForUser();
     }, [session, isPending]);
     
-      if (loading) return <p>Loading review counts...</p>;
+      if (loading) return <p className="flex">Loading review counts...</p>;
       if (error) return <p>Error: {error}</p>;
     
 
