@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 export default function Service() {
+    return(
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-6 flex flex-col items-center">
     {/* Card container */}
     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl p-6 flex flex-col gap-6">
@@ -42,5 +43,6 @@ export default function Service() {
         </div>
     </div>
     </div>
+    );
 
 }
