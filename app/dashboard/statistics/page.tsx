@@ -55,19 +55,19 @@ export default function Stats() {
       <h1 className="text-2xl font-bold mb-6">Client Reviews</h1>
       <div className="flex space-x-6">
         <Link
-          href="/statistics"
+          href="/dashboard/statistics"
           className="px-6 py-3 border-2 border-green-500 text-green-500 rounded-xl hover:bg-green-50 transition"
         >
           Good: {counts?.good}
         </Link>
         <Link
-          href="/statistics/bad-reviews"
+          href="/dashboard/statistics/bad-reviews"
           className="px-6 py-3 border-2 border-red-500 text-red-500 rounded-xl hover:bg-red-50 transition"
         >
           Bad: {counts?.bad}
         </Link>
         <Link
-          href="/statistics"
+          href="/dashboard/statistics"
           className="px-6 py-3 border-2 border-gray-500 text-gray-500 rounded-xl hover:bg-gray-50 transition"
         >
           Not Reviewed Yet: {counts?.not_reviewed_yet}
