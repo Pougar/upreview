@@ -12,7 +12,7 @@ export default function SideNav() {
         await authClient.signOut({
             fetchOptions: {
                 onSuccess: () => {
-                router.push("/login"); // redirect to login page
+                router.push("/log-in"); // redirect to login page
                 }
             }
         });
