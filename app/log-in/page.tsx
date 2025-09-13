@@ -11,10 +11,29 @@ export default function Login() {
   const { data: session } = authClient.useSession();
 
     useEffect(() => {
-    if (session) {
-      router.replace("/dashboard");
+      if (!session) return;
+    const redirect = async () => {
+      await redirectToDashboard(session.user.id);
+    };
+
+  redirect();
+  }, [session]);
+
+    const redirectToDashboard = async (userId: string) => {
+    try {
+      const res = await fetch("/api/get-name", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: userId }),
+      });
+      const data = await res.json();
+      if (data.name) {
+        router.replace(`/app/${data.name}/dashboard`);
+      }
+    } catch (err) {
+      console.error("Failed to fetch username:", err);
     }
-  });
+  };
 
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -40,7 +59,7 @@ export default function Login() {
         if (data) {
           // Login succeeded
           console.log("Login successful:");
-          router.push("/dashboard"); // redirect to protected page
+          await redirectToDashboard(data.user.id); // redirect to protected page
         }else{
           setMessage("Login failed");
         }
