@@ -3,7 +3,7 @@
 import { createContext, useContext } from "react";
 
 interface UserContextValue {
-  username: string;
+  name: string;
 }
 
 const UserContext = createContext<UserContextValue | null>(null);

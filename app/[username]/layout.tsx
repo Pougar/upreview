@@ -13,18 +13,20 @@ interface UserLayoutProps {
   params: Record<string, string | string[]>; // generic object
 }
 
-export default async function BusinessName( { children, params }: UserLayoutProps) {
+export default async function BusinessName( { children, params }: { children: React.ReactNode, params: Promise<{ username: string }>
+}) {
 
     const { data: session } = await authClient.getSession() // get logged-in user
-    const usernameParam = params.username;
-    const username = Array.isArray(usernameParam) ? usernameParam[0] : usernameParam;
+    const username = await params;
+    const name = username.username;
 
-    if (RESERVED_USERNAMES.includes(username)) {
+
+    if (RESERVED_USERNAMES.includes(name)) {
         return <>{children}</>;
     }
 
     if (!session) {
-    redirect("/log-in");
+        redirect("/log-in");
     }
     const res = await fetch("/api/get-name", {
         method: "POST",
@@ -34,8 +36,8 @@ export default async function BusinessName( { children, params }: UserLayoutProp
         })
     });
     const data = await res.json();
-    if (data.name !== username) {
+    if (data.name !== name) {
         redirect("/log-in");
     }
-    return <UserProvider value={{ username }}>{children}</UserProvider>;
+    return <UserProvider value={{ name}}>{children}</UserProvider>;
 }
