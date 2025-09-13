@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useUser } from "../UserContext";
 
 export default function DashboardPage() {
+    const { username } = useUser();
   return (
         <div className="rounded-2xl min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-6 flex flex-col items-center">
             {/* Logo */}
@@ -16,7 +18,7 @@ export default function DashboardPage() {
 
             {/* Main Content */}
             <div className="bg-white rounded-2xl shadow-2xl p-10 max-w-4xl w-full flex flex-col items-center gap-6 text-center relative z-10">
-                <h1 className="text-3xl font-bold text-gray-800">Welcome to Review Remind!</h1>
+                <h1 className="text-3xl font-bold text-gray-800">Welcome to Review Remind {username}!</h1>
                 <p className="text-gray-600 text-lg sm:text-xl max-w-2xl">
                 Our product helps you increase positive Google reviews for your business by making the review process easier for your clients. 
                 Set up a personalized email that we automatically send to your clients after you finish helping them — saving you time and boosting your online reputation.

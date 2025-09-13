@@ -1,9 +1,19 @@
 import { authClient } from "@/app/lib/auth-client"
 import { redirect } from "next/navigation";
+import { UserProvider } from "./UserContext"
 
 const RESERVED_USERNAMES = ["help"];
 
-export default async function BusinessName( { children, params }: { children: React.ReactNode; params: { username: string };}) {
+type LayoutParams = {
+  username: string; // must match your folder [username]
+};
+
+interface UserLayoutProps {
+  children: React.ReactNode;
+  params: LayoutParams;
+}
+
+export default async function BusinessName({ children, params }: UserLayoutProps) {
 
     const { data: session } = await authClient.getSession() // get logged-in user
     const { username } = params;
@@ -26,5 +36,5 @@ export default async function BusinessName( { children, params }: { children: Re
     if (data.name !== username) {
         redirect("/log-in");
     }
-    return <>{children}</>;
+    return <UserProvider value={{ username }}>{children}</UserProvider>;
 }
