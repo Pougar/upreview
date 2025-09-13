@@ -8,10 +8,10 @@ export async function middleware(req: NextRequest) {
   const protectedPaths = ["/dashboard", "/settings", "/payment"];
 
   const url = req.nextUrl.clone();
-  const isProtected = protectedPaths.some((path) => url.pathname.startsWith(path));
+  const unprotectedPaths = ["/", "/sign-up", "/log-in"];
 
-  if (!isProtected) {
-    return NextResponse.next(); // allow public paths
+  if (unprotectedPaths.some((path) => url.pathname.startsWith(path))) {
+    return NextResponse.next();
   }
 
   const sessionToken = req.cookies.get("__Secure-better-auth.session_token")?.value;
@@ -48,5 +48,9 @@ export async function middleware(req: NextRequest) {
 
 // Apply middleware only to these paths
 export const config = {
-  matcher: ["/dashboard/:path*", "/profile/:path*"],
+    matcher: [
+    "/profile/:path*",
+    "/app/:username/dashboard/:path*",
+    "/app/:username/setup/:path*"
+  ]
 };

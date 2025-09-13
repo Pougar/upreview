@@ -48,7 +48,7 @@ export default function SignUpPage() {
                     });
                 }
                 setLoading(false);
-                router.push("/payment");
+                router.push(`/app/${ctx.data.user.name}/setup`);
             },
             onError: (ctx) => {
                 // display the error message
