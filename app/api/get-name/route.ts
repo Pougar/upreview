@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await pool.query(
-    `SELECT name FROM user WHERE id = $1`,
+    `SELECT name FROM myusers WHERE betterauth_id = $1`,
     [id]
     );
 
