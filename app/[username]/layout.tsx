@@ -10,13 +10,14 @@ type LayoutParams = {
 
 interface UserLayoutProps {
   children: React.ReactNode;
-  params: LayoutParams;
+  params: Record<string, string | string[]>; // generic object
 }
 
-export default async function BusinessName({ children, params }: UserLayoutProps) {
+export default async function BusinessName( { children, params }: UserLayoutProps) {
 
     const { data: session } = await authClient.getSession() // get logged-in user
-    const { username } = params;
+    const usernameParam = params.username;
+    const username = Array.isArray(usernameParam) ? usernameParam[0] : usernameParam;
 
     if (RESERVED_USERNAMES.includes(username)) {
         return <>{children}</>;
