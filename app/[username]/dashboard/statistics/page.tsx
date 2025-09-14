@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { authClient } from "@/app/lib/auth-client";
 import Link from "next/link";
 import Image from "next/image";
+import { checkUserSession } from "@/app/ui/dashboard/AuthGuard";
 
 
 type ReviewCounts = {
@@ -12,7 +13,14 @@ type ReviewCounts = {
     not_reviewed_yet: number;
   };
 
-export default function Stats() {
+export default function Stats({ params }: { params: { username: string } }) {
+
+    useEffect(() => {
+    const nameCheck = async () => {
+        await checkUserSession(params.username);
+    }
+    nameCheck();
+    }, [params.username]);
 
     const { data: session, isPending } = authClient.useSession();
     const [counts, setCounts] = useState<ReviewCounts | null>(null);
@@ -64,7 +72,7 @@ export default function Stats() {
 
             {/* Good Reviews */}
             <Link
-            href="/dashboard/statistics/good-reviews"
+            href="/${params.username}/dashboard/statistics/good-reviews"
             className="bg-green-200 text-green-800 rounded-2xl p-6 flex flex-col items-center justify-between gap-4 hover:bg-green-300 transition w-72 h-72 shadow-md inline-flex"
             >
             <div className="text-center">

@@ -36,13 +36,13 @@ export default function DashboardPage({ params }: { params: { username: string }
                 {/* Optional Call-to-Action buttons */}
                 <div className="flex flex-col sm:flex-row gap-4 mt-6">
                 <Link
-                    href="/dashboard/service"
+                    href="/${params.username}/dashboard/service"
                     className="bg-blue-500 text-white px-6 py-3 rounded-full hover:bg-blue-600 transition w-full sm:w-auto"
                 >
                     Customize Email
                 </Link>
                 <Link
-                    href="/dashboard/statistics"
+                    href="/${params.username}/dashboard/statistics"
                     className="border border-gray-300 px-6 py-3 rounded-full hover:bg-gray-100 transition w-full sm:w-auto"
                 >
                     View Analytics

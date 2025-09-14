@@ -1,8 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { checkUserSession } from "@/app/ui/dashboard/AuthGuard";
+import { useEffect, useState } from "react";
 
-export default function Service() {
+export default function Service({ params }: { params: { username: string } }) {
+    useEffect(() => {
+    const nameCheck = async () => {
+        await checkUserSession(params.username);
+    }
+    nameCheck();
+    }, [params.username]);
     return(
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-6 flex flex-col items-center">
     {/* Card container */}
