@@ -10,27 +10,25 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const params = useParams();
   const rawUsername = params.username;
-
-  // Bail out early if param missing
-  if (!rawUsername) {
-    router.replace("/log-in");
-    return null;
-  }
-
-  // Normalize param (since it could be string | string[])
   const username = Array.isArray(rawUsername) ? rawUsername[0] : rawUsername;
 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data: session } = await authClient.getSession();
+      // If param is missing, just redirect
+      if (!username) {
+        router.replace("/log-in");
+        return;
+      }
 
+      // Reserved usernames skip checks
       if (RESERVED_USERNAMES.includes(username)) {
         setLoading(false);
         return;
       }
 
+      const { data: session } = await authClient.getSession();
       if (!session) {
         router.replace("/log-in");
         return;
