@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useUser } from "../UserContext";
+import { UserProvider, useUser } from "../UserContext";
 import { checkUserSession } from "@/app/ui/dashboard/AuthGuard";
 import { useState, useEffect } from "react";
 
@@ -15,6 +15,7 @@ export default function DashboardPage({ params }: { params: { username: string }
 
     const { name } = useUser();
   return (
+        <UserProvider value={{ name: params.username }}>
         <div className="rounded-2xl min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-6 flex flex-col items-center">
             {/* Logo */}
             <div className="w-32 mb-8">
@@ -50,6 +51,7 @@ export default function DashboardPage({ params }: { params: { username: string }
                 </div>
             </div>
         </div>
+        </UserProvider>
 
   );
 }
