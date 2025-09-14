@@ -23,7 +23,10 @@ export default async function UsernameLayout({ children, params }: UsernameLayou
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get("__Secure-better-auth.session_token")?.value;
 
-  if (!sessionToken) redirect("/log-in");
+  if (!sessionToken) {
+    console.log("No session token in layout");
+    redirect("/log-in");
+  }
 
   // Verify session server-side
   const {data: session, error } = await authClient.getSession({
@@ -34,10 +37,14 @@ export default async function UsernameLayout({ children, params }: UsernameLayou
 
 
 if (!session || !session.user) {
+    console.log("No session or user in layout");
   redirect("/log-in"); // user not logged in
 }
 
-  if (!session) redirect("/log-in");
+  if (!session) {
+    console.log("No session in layout");
+    redirect("/log-in");
+  }
 
   // Verify the username matches the session user
   const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/get-name`, {
@@ -50,6 +57,7 @@ if (!session || !session.user) {
   const data = await res.json();
 
   if (data.name !== username) {
+    console.log("Username does not match session user in layout");
     redirect("/log-in");
   }
 
