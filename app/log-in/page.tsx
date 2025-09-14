@@ -28,7 +28,7 @@ export default function Login() {
       });
       const data = await res.json();
       if (data.name) {
-        router.replace(`/app/${data.name}/dashboard`);
+        router.replace(`/${data.name}/dashboard`);
       }
     } catch (err) {
       console.error("Failed to fetch username:", err);
