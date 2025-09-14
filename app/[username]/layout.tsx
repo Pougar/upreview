@@ -1,4 +1,5 @@
 // app/[username]/layout.tsx
+import { cookies } from "next/headers";
 import { ReactNode } from "react";
 import { authClient } from "@/app/lib/auth-client";
 import { redirect } from "next/navigation";
@@ -19,12 +20,24 @@ export default async function UsernameLayout({ children, params }: UsernameLayou
     return <>{children}</>;
   }
 
-  // Get session from BetterAuth
-  const { data: session } = await authClient.getSession();
+  const cookieStore = await cookies();
+  const sessionToken = cookieStore.get("__Secure-better-auth.session_token")?.value;
 
-  if (!session) {
-    redirect("/log-in"); // server-side redirect
-  }
+  if (!sessionToken) redirect("/log-in");
+
+  // Verify session server-side
+  const {data: session, error } = await authClient.getSession({
+    fetchOptions: {
+      headers: { cookie: `__Secure-better-auth.session_token=${sessionToken}` }
+    }
+  });
+
+
+if (!session || !session.user) {
+  redirect("/log-in"); // user not logged in
+}
+
+  if (!session) redirect("/log-in");
 
   // Verify the username matches the session user
   const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/get-name`, {
