@@ -26,6 +26,7 @@ export default async function BusinessName( { children, params }: { children: Re
     }
 
     if (!session) {
+        console.log("no sesssion found");
         redirect("/log-in");
     }
     const res = await fetch("/api/get-name", {
@@ -37,6 +38,7 @@ export default async function BusinessName( { children, params }: { children: Re
     });
     const data = await res.json();
     if (data.name !== name) {
+        console.log("username mismatch");
         redirect("/log-in");
     }
     return <UserProvider value={{ name}}>{children}</UserProvider>;
