@@ -5,7 +5,7 @@ import { useUser } from "../UserContext";
 import { checkUserSession } from "@/app/ui/dashboard/AuthGuard";
 import { useState, useEffect } from "react";
 
-export default async function DashboardPage({ params }: { params: { username: string } }) {
+export default function DashboardPage({ params }: { params: { username: string } }) {
       useEffect(() => {
         const nameCheck = async () => {
             await checkUserSession(params.username);
