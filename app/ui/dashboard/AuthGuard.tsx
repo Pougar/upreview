@@ -7,6 +7,7 @@ import { authClient } from "@/app/lib/auth-client";
 const RESERVED_USERNAMES = ["help"];
 
 export async function checkUserSession(username: string) {
+    /*
     const router = useRouter();
   const { data: session } = await authClient.getSession();
 
@@ -30,5 +31,5 @@ export async function checkUserSession(username: string) {
 
   if (data.name !== username) {
     router.push("/log-in");
-  }
+  }*/
 }
