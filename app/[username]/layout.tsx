@@ -8,11 +8,11 @@ const RESERVED_USERNAMES = ["help"];
 
 interface UsernameLayoutProps {
   children: ReactNode;
-  params: { username: string };
+  params: Promise<{ username: string }>; // <-- params is a Promise
 }
 
 export default async function UsernameLayout({ children, params }: UsernameLayoutProps) {
-  const { username } = params;
+  const { username } = await params;
 
   // Skip reserved usernames
   if (RESERVED_USERNAMES.includes(username)) {
