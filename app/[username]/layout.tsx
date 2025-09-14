@@ -22,6 +22,7 @@ export default async function UsernameLayout({ children, params }: UsernameLayou
 
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get("__Secure-better-auth.session_token")?.value;
+  console.log("sessionToken:", sessionToken);
 
   if (!sessionToken) {
     console.log("No session token in layout");
