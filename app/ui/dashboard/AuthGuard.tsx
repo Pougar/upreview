@@ -1,9 +1,11 @@
 import { authClient } from "@/app/lib/auth-client";
 import { redirect } from "next/navigation";
+import { useRouter} from "next/navigation";
 
 const RESERVED_USERNAMES = ["help"];
 
 export async function checkUserSession(username: string) {
+    const router = useRouter();
   const { data: session } = await authClient.getSession();
 
   if (RESERVED_USERNAMES.includes(username)) {
@@ -24,6 +26,6 @@ export async function checkUserSession(username: string) {
   const data = await res.json();
 
   if (data.name !== username) {
-    redirect("/log-in");
+    router.push("/log-in");
   }
 }
