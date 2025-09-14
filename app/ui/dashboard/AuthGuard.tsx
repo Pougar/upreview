@@ -1,9 +1,13 @@
+"use client";
+
+import { useRouter } from "next/navigation";
 import { authClient } from "@/app/lib/auth-client";
 
 
 const RESERVED_USERNAMES = ["help"];
 
 export async function checkUserSession(username: string) {
+    const router = useRouter();
   const { data: session } = await authClient.getSession();
 
   if (RESERVED_USERNAMES.includes(username)) {
@@ -11,7 +15,8 @@ export async function checkUserSession(username: string) {
   }
 
   if (!session) {
-    return (false);
+    router.push("/log-in");
+    return;
   }
 
   const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/get-name`, {
@@ -24,7 +29,6 @@ export async function checkUserSession(username: string) {
   const data = await res.json();
 
   if (data.name !== username) {
-    return (false);
+    router.push("/log-in");
   }
-  return (true);
 }
