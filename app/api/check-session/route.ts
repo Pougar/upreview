@@ -27,9 +27,9 @@ export async function POST(req: NextRequest) {
     }
 
     // ✅ Validate the session with Better Auth’s API
-    const sessionRes = await fetch(`${process.env.AUTH_URL}/sessions/${sessionToken}`, {
+    const sessionRes = await fetch(`${process.env.BETTER_AUTH_URL}/sessions/${sessionToken}`, {
       headers: {
-        Authorization: `Bearer ${process.env.AUTH_API_KEY}`,
+        Authorization: `Bearer ${process.env.BETTER_AUTH_SECRET}`,
         "Content-Type": "application/json",
       },
       cache: "no-store",
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     const session = await sessionRes.json();
 
     // ✅ Fetch the user’s stored username (or replace with direct DB query if you prefer)
-    const nameRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/get-name`, {
+    const nameRes = await fetch(`/api/get-name`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: session.user.id }),
