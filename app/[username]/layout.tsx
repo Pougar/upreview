@@ -14,7 +14,7 @@ export default async function UsernameLayout({ children, params }: UsernameLayou
   const { username } = resolvedParams;
 
   // ✅ Call server API to validate session + username
-  const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/check-session`, {
+  const res = await fetch(`/api/check-session`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username }),
