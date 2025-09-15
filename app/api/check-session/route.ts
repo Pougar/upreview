@@ -7,6 +7,7 @@ export async function POST(req: NextRequest) {
     const { username } = await req.json();
 
     if (!username) {
+        console.log("No username provided in check-session");
       return NextResponse.json(
         { valid: false, reason: "No username provided" },
         { status: 400 }
@@ -18,6 +19,7 @@ export async function POST(req: NextRequest) {
     const sessionToken = cookieStore.get("__Secure-better-auth.session_token")?.value;
 
     if (!sessionToken) {
+        console.log("No session token in check-session");
       return NextResponse.json(
         { valid: false, reason: "No session token" },
         { status: 401 }
@@ -34,6 +36,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!sessionRes.ok) {
+        console.log("Session validation failed in check-session (line 37)");
       return NextResponse.json(
         { valid: false, reason: "Invalid session" },
         { status: 401 }
@@ -51,6 +54,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!nameRes.ok) {
+        console.log("Failed to fetch user name in check-session");
       return NextResponse.json(
         { valid: false, reason: "Failed to fetch user name" },
         { status: 500 }
@@ -60,6 +64,7 @@ export async function POST(req: NextRequest) {
     const { name } = await nameRes.json();
 
     if (name !== username) {
+        console.log("Username mismatch in check-session");
       return NextResponse.json(
         { valid: false, reason: "Username mismatch" },
         { status: 403 }
