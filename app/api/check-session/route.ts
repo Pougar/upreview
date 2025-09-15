@@ -1,8 +1,8 @@
-// app/api/check-session/route.ts
-import { NextResponse } from "next/server";
+
+import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const { username } = await req.json();
 
@@ -13,7 +13,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Grab the session token from cookies
+    // ✅ Grab the session token from cookies
     const cookieStore = await cookies();
     const sessionToken = cookieStore.get("__Secure-better-auth.session_token")?.value;
 
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Validate the session with Better Auth’s API
+    // ✅ Validate the session with Better Auth’s API
     const sessionRes = await fetch(`${process.env.AUTH_URL}/sessions/${sessionToken}`, {
       headers: {
         Authorization: `Bearer ${process.env.AUTH_API_KEY}`,
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
 
     const session = await sessionRes.json();
 
-    // Fetch the user’s stored username (or decode from session if available)
+    // ✅ Fetch the user’s stored username (or replace with direct DB query if you prefer)
     const nameRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/get-name`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

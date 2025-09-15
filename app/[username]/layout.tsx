@@ -5,13 +5,15 @@ import { UserProvider } from "./UserContext";
 
 interface UsernameLayoutProps {
   children: ReactNode;
-  params: { username: string };
+  params: Promise<{ username: string }>; // ✅ Promise in Next.js 15
 }
 
 export default async function UsernameLayout({ children, params }: UsernameLayoutProps) {
-  const { username } = params;
+  // ✅ Await the promise before destructuring
+  const resolvedParams = await params;
+  const { username } = resolvedParams;
 
-  // Ask server API to validate session + username
+  // ✅ Call server API to validate session + username
   const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/check-session`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -31,6 +33,6 @@ export default async function UsernameLayout({ children, params }: UsernameLayou
     redirect("/log-in");
   }
 
-  // If valid, wrap children in UserProvider
+  // ✅ If valid, wrap children in UserProvider
   return <UserProvider value={{ name: username }}>{children}</UserProvider>;
 }
