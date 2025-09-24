@@ -51,6 +51,5 @@ export const config = {
     matcher: [
     "/profile/:path*",
     "/:username/dashboard/:path*",
-    "/:username/setup/:path*"
   ]
 };

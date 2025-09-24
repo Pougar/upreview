@@ -21,14 +21,15 @@ export default function Login() {
 
     const redirectToDashboard = async (userId: string) => {
     try {
-      const res = await fetch("/api/get-name", {
+      const res = await fetch("http://localhost:3000/api/get-name", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: userId }),
       });
       const data = await res.json();
-      if (data.name) {
-        router.replace(`/${data.name}/dashboard`);
+      const {name, display_name} = data.user; // support both shapes
+      if (name) {
+        router.replace(`/${name}/dashboard`);
       }
     } catch (err) {
       console.error("Failed to fetch username:", err);
