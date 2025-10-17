@@ -48,7 +48,7 @@ export default function AddClientPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/add-client", {
+      const res = await fetch("/api/clients/add-client", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

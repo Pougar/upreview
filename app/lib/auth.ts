@@ -15,7 +15,14 @@ export const auth = betterAuth({
         "*.vercel.app",        // regex: matches all preview deployments
         "https://your-production-domain.com" // your prod domain
         ],
-    /*socialProviders: {
-        //If I wanted to add Google or (perhaps Xero) as a way to sign in and log in
-    }, */
+    socialProviders: {
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      accessType: "offline",                 // get refresh token
+      prompt: "select_account consent",
+      // Optional: request GBP scope up front
+      scopes: ["https://www.googleapis.com/auth/business.manage"],
+    },
+  },
 })

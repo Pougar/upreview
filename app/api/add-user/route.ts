@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
       businessName,
       businessEmail,
       googleBusinessLink,
+      description,      // <-- NEW: optional
       name: legacyName, // fallback
     }: {
       id?: string;
@@ -56,6 +57,7 @@ export async function POST(req: NextRequest) {
       businessName?: string;
       businessEmail?: string;
       googleBusinessLink?: string;
+      description?: string; // <-- NEW
       name?: string;
     } = body || {};
 
@@ -75,6 +77,11 @@ export async function POST(req: NextRequest) {
     }
 
     const displayName = String(nameInput).trim();
+    const descriptionValue =
+      typeof description === "string" && description.trim().length > 0
+        ? description.trim()
+        : null;
+
     let base = slugify(displayName);
     if (!base) {
       const local = String(email).split("@")[0] ?? "";
@@ -107,13 +114,22 @@ export async function POST(req: NextRequest) {
           display_name,
           email,
           business_email,
-          google_business_link
+          google_business_link,
+          description                -- <-- NEW
         )
-        VALUES ($1, $2, $3, $4, $5, $6)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         ON CONFLICT (betterauth_id) DO NOTHING
-        RETURNING betterauth_id, name, display_name, email, business_email, google_business_link
+        RETURNING betterauth_id, name, display_name, email, business_email, google_business_link, description
         `,
-        [id, base, displayName, email, businessEmail ?? null, googleBusinessLink ?? null]
+        [
+          id,
+          base,
+          displayName,
+          email,
+          businessEmail ?? null,
+          googleBusinessLink ?? null,
+          descriptionValue, // <-- NEW
+        ]
       );
 
       if (result.rows.length === 0) {

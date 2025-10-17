@@ -7,7 +7,7 @@ import { useUser } from "../../UserContext";
 import { authClient } from "@/app/lib/auth-client";
 import { useLogoUrl } from "@/app/lib/logoUrlClient";
 
-// --- helpers: same slugify + google link check you've used elsewhere ---
+// --- helpers ---
 function slugify(input: string, maxLen = 60): string {
   const ascii = input.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
   return ascii
@@ -32,21 +32,12 @@ function looksLikeGoogleBusinessLink(urlStr?: string) {
 export default function UserSettings() {
   const router = useRouter();
   const { name: currentSlug, display } = useUser();
-  const { data: session } = authClient.useSession(); // { user: { id, email } } | null
+  const { data: session } = authClient.useSession();
   const authUserId = session?.user?.id ?? "";
   const accountEmail = session?.user?.email ?? "";
 
-  // logo (current signed URL from provider, with auto-refresh)
+  // logo
   const { url: logoUrl, refresh: refreshLogoUrl } = useLogoUrl();
-
-  // --- Google link state ---
-  const [googleLink, setGoogleLink] = useState("");
-  const googleLinkIsValid = useMemo(() => looksLikeGoogleBusinessLink(googleLink), [googleLink]);
-  const [savingGoogle, setSavingGoogle] = useState(false);
-  const [googleMsg, setGoogleMsg] = useState<string | null>(null);
-  const [googleIsError, setGoogleIsError] = useState(false);
-
-  // --- Logo upload state ---
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [localPreview, setLocalPreview] = useState<string | null>(null);
@@ -54,21 +45,20 @@ export default function UserSettings() {
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
   const [uploadIsError, setUploadIsError] = useState(false);
 
-  // --- Dashboard URL (slug) state ---
-  const [slugInput, setSlugInput] = useState(currentSlug || "");
-  const [checkingAvail, setCheckingAvail] = useState(false);
-  const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
-  const [slugMsg, setSlugMsg] = useState<string | null>(null);
-  const [slugSaving, setSlugSaving] = useState(false);
-  const [slugIsError, setSlugIsError] = useState(false);
+  // single-save fields
+  const [description, setDescription] = useState("");
+  const [googleLink, setGoogleLink] = useState("");
+  const googleLinkIsValid = useMemo(() => looksLikeGoogleBusinessLink(googleLink), [googleLink]);
 
-  // live preview url
+  const [slugInput, setSlugInput] = useState(currentSlug || "");
   const prettyURL = useMemo(
     () => (slugInput ? `/${slugify(slugInput)}/dashboard` : "/[your-business]/dashboard"),
     [slugInput]
   );
 
-  // Debounced availability check for the slug (uses your existing API)
+  // slug availability
+  const [checkingAvail, setCheckingAvail] = useState(false);
+  const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
   useEffect(() => {
     if (!slugInput || slugInput === currentSlug) {
       setIsAvailable(null);
@@ -81,7 +71,6 @@ export default function UserSettings() {
         const q = new URLSearchParams({ name: slugInput, email: accountEmail || "" }).toString();
         const res = await fetch(`/api/name-availability?${q}`, { cache: "no-store" });
         const data = await res.json().catch(() => ({}));
-        // Expecting something like { available: true } from your endpoint
         if (alive) setIsAvailable(Boolean(data?.available));
       } catch {
         if (alive) setIsAvailable(null);
@@ -95,8 +84,52 @@ export default function UserSettings() {
     };
   }, [slugInput, accountEmail, currentSlug]);
 
-  // Pick a file & show a local preview (before upload)
-  const pickFile = () => fileInputRef.current?.click();
+  // load business info
+  const [infoLoading, setInfoLoading] = useState(true);
+  useEffect(() => {
+    let alive = true;
+    if (!authUserId) return;
+    const ctrl = new AbortController();
+    (async () => {
+      try {
+        const res = await fetch("/api/settings/user-settings/get-business-info", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: authUserId }),
+          signal: ctrl.signal,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!alive) return;
+        if (res.ok) {
+          setDescription(typeof data?.description === "string" ? data.description : "");
+          setGoogleLink(
+            typeof data?.googleBusinessLink === "string" ? data.googleBusinessLink : ""
+          );
+        } else {
+          setDescription("");
+          setGoogleLink("");
+        }
+      } catch {
+        if (alive) {
+          setDescription("");
+          setGoogleLink("");
+        }
+      } finally {
+        if (alive) setInfoLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+      ctrl.abort();
+    };
+  }, [authUserId]);
+
+  // consolidated save state
+  const [savingAll, setSavingAll] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [saveIsError, setSaveIsError] = useState(false);
+
+  // logo helpers
   const onPick = (f?: File) => {
     if (!f) return;
     setFile(f);
@@ -104,44 +137,6 @@ export default function UserSettings() {
     reader.onload = (e) => setLocalPreview((e.target?.result as string) || null);
     reader.readAsDataURL(f);
   };
-
-  // --- Handlers ---
-  const handleSaveGoogle = async () => {
-    setGoogleMsg(null);
-    setGoogleIsError(false);
-    if (!authUserId) {
-      setGoogleMsg("Missing user session.");
-      setGoogleIsError(true);
-      return;
-    }
-    if (!googleLinkIsValid) {
-      setGoogleMsg("Please enter a valid Google Business / Maps URL.");
-      setGoogleIsError(true);
-      return;
-    }
-    setSavingGoogle(true);
-    try {
-      const res = await fetch("/api/update-google-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: authUserId, googleBusinessLink: googleLink || null }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setGoogleMsg(data?.message || data?.error || "Could not save Google link.");
-        setGoogleIsError(true);
-      } else {
-        setGoogleMsg("Saved your Google Business / Maps URL.");
-        setGoogleIsError(false);
-      }
-    } catch {
-      setGoogleMsg("Network error. Please try again.");
-      setGoogleIsError(true);
-    } finally {
-      setSavingGoogle(false);
-    }
-  };
-
   const handleUploadLogo = async () => {
     setUploadMsg(null);
     setUploadIsError(false);
@@ -168,15 +163,10 @@ export default function UserSettings() {
         setUploadMsg(data?.message || data?.error || "Upload failed.");
         setUploadIsError(true);
       } else {
-        // Preview the stored image if the API returns a signedUrl; otherwise force provider refresh
         const signedUrl = data?.signedUrl || data?.user?.company_logo_url || null;
-        if (signedUrl) {
-          // Replace local preview with the actually stored image
-          setLocalPreview(signedUrl);
-        }
-        // In any case, refresh provider so TopNav/Header etc. update
+        if (signedUrl) setLocalPreview(signedUrl);
         void refreshLogoUrl();
-        setUploadMsg("Logo updated!");
+        setUploadMsg("Logo updated.");
         setUploadIsError(false);
       }
     } catch {
@@ -187,219 +177,321 @@ export default function UserSettings() {
     }
   };
 
-  const handleSaveSlug = async () => {
-    setSlugMsg(null);
-    setSlugIsError(false);
+  // save all (desc + google link + slug)
+  const handleSaveAll = async () => {
+    setSaveMsg(null);
+    setSaveIsError(false);
 
+    if (!authUserId) {
+      setSaveMsg("Missing user session.");
+      setSaveIsError(true);
+      return;
+    }
+    if (googleLink && !googleLinkIsValid) {
+      setSaveMsg("Please enter a valid Google Business / Maps URL.");
+      setSaveIsError(true);
+      return;
+    }
     const cleaned = slugify(slugInput);
+    const slugChanged = cleaned !== currentSlug;
+    if (slugChanged && isAvailable === false) {
+      setSaveMsg("That dashboard URL is already taken.");
+      setSaveIsError(true);
+      return;
+    }
     if (!cleaned) {
-      setSlugMsg("Please enter a valid dashboard URL (letters & numbers).");
-      setSlugIsError(true);
-      return;
-    }
-    if (cleaned !== slugInput) {
-      // normalize input to the slugified value
-      setSlugInput(cleaned);
-    }
-    if (!authUserId || !accountEmail) {
-      setSlugMsg("Missing user session.");
-      setSlugIsError(true);
-      return;
-    }
-    if (cleaned !== currentSlug && isAvailable === false) {
-      setSlugMsg("That URL is already taken.");
-      setSlugIsError(true);
+      setSaveMsg("Please enter a valid dashboard URL (letters & numbers).");
+      setSaveIsError(true);
       return;
     }
 
-    setSlugSaving(true);
+    type OpName = "description" | "google" | "slug";
+    type OpResult = { name: OpName; ok: boolean; message?: string };
+
+    setSavingAll(true);
     try {
-      const res = await fetch("/api/update-slug", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: authUserId, newName: cleaned, email: accountEmail }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setSlugMsg(data?.message || data?.error || "Could not update dashboard URL.");
-        setSlugIsError(true);
-      } else {
-        setSlugMsg("Dashboard URL updated.");
-        setSlugIsError(false);
-        // navigate to the new route so your server layout revalidates and context matches
-        router.push(`/${cleaned}/dashboard/settings`);
+      const ops: Promise<OpResult>[] = [];
+
+      // Description
+      ops.push(
+        fetch("/api/settings/user-settings/update-business-description", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: authUserId, description: description || null }),
+        })
+          .then(async (res): Promise<OpResult> => {
+            if (res.ok) return { name: "description" as const, ok: true };
+            const data = await res.json().catch(() => ({}));
+            return {
+              name: "description" as const,
+              ok: false,
+              message: String(data?.message || data?.error || "Could not save description."),
+            };
+          })
+          .catch((): OpResult => ({
+            name: "description" as const,
+            ok: false,
+            message: "Network error saving description.",
+          }))
+      );
+
+      // Google link
+      ops.push(
+        fetch("/api/settings/user-settings/update-google-link", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: authUserId, googleBusinessLink: googleLink || null }),
+        })
+          .then(async (res): Promise<OpResult> => {
+            if (res.ok) return { name: "google" as const, ok: true };
+            const data = await res.json().catch(() => ({}));
+            return {
+              name: "google" as const,
+              ok: false,
+              message: String(data?.message || data?.error || "Could not save Google link."),
+            };
+          })
+          .catch((): OpResult => ({
+            name: "google" as const,
+            ok: false,
+            message: "Network error saving Google link.",
+          }))
+      );
+
+      // Slug
+      if (slugChanged) {
+        if (!accountEmail) {
+          ops.push(
+            Promise.resolve<OpResult>({
+              name: "slug",
+              ok: false,
+              message: "Missing account email for slug update.",
+            })
+          );
+        } else {
+          ops.push(
+            fetch("/api/update-slug", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ userId: authUserId, newName: cleaned, email: accountEmail }),
+            })
+              .then(async (res): Promise<OpResult> => {
+                if (res.ok) return { name: "slug" as const, ok: true };
+                const data = await res.json().catch(() => ({}));
+                return {
+                  name: "slug" as const,
+                  ok: false,
+                  message: String(data?.message || data?.error || "Could not update dashboard URL."),
+                };
+              })
+              .catch((): OpResult => ({
+                name: "slug",
+                ok: false,
+                message: "Network error saving dashboard URL.",
+              }))
+          );
+        }
       }
-    } catch {
-      setSlugMsg("Network error. Please try again.");
-      setSlugIsError(true);
+
+      const results = await Promise.all(ops);
+      const failed = results.filter((r) => !r.ok);
+      if (failed.length === 0) {
+        setSaveMsg("All changes saved.");
+        setSaveIsError(false);
+        if (slugChanged && results.some((r) => r.name === "slug" && r.ok)) {
+          router.push(`/${cleaned}/dashboard/settings/user-settings`);
+        }
+      } else {
+        const parts = failed.map((f) => {
+          if (f.name === "description") return `Description: ${f.message}`;
+          if (f.name === "google") return `Google link: ${f.message}`;
+          if (f.name === "slug") return `Dashboard URL: ${f.message}`;
+          return f.message || "Unknown error";
+        });
+        setSaveMsg(parts.join("  •  "));
+        setSaveIsError(true);
+      }
     } finally {
-      setSlugSaving(false);
+      setSavingAll(false);
     }
   };
 
   return (
-      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-2xl flex flex-col gap-8">
-        <h1 className="text-2xl font-bold text-gray-800 text-center">{display} Settings</h1>
+    <div className="min-h-screen">{/* no background color */}
+      <main className=" w-full max-w-3xl px-4 sm:px-6 lg:px-8 py-10">
+        {/* Top header (integrated, no card) */}
+        <div className="flex items-center justify-between pb-4 border-b border-gray-200">
+          <h1 className="text-base font-semibold text-gray-900">
+            {display ? `${display} Settings` : "Settings"}
+          </h1>
+          <button
+            type="button"
+            onClick={handleSaveAll}
+            disabled={
+              savingAll ||
+              infoLoading ||
+              !authUserId ||
+              !slugify(slugInput) ||
+              (googleLink ? !googleLinkIsValid : false) ||
+              (slugInput !== currentSlug && isAvailable === false)
+            }
+            className="inline-flex items-center rounded-md border border-indigo-600 bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:border-indigo-300 disabled:bg-indigo-300"
+          >
+            {savingAll ? "Saving…" : "Save changes"}
+          </button>
+        </div>
 
-        {/* Company Logo */}
-        <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold text-gray-800">Profile Photo (Company Logo)</h2>
-          <div className="flex items-center gap-4">
-            <img
-              src={localPreview || logoUrl || "/snakepic.png"}
-              alt="Company logo"
-              className="h-16 w-16 rounded-lg object-cover ring-1 ring-black/10 bg-gray-100"
-              onError={(e) => {
-                if (!e.currentTarget.src.endsWith("/snakepic.png")) {
-                  e.currentTarget.src = "/snakepic.png";
-                }
-              }}
-            />
-            <div className="flex items-center gap-3">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => onPick(e.target.files?.[0] ?? undefined)}
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="px-4 py-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-800"
-              >
-                Choose Image
-              </button>
-              <button
-                type="button"
-                onClick={handleUploadLogo}
-                disabled={!file || uploading}
-                className="px-4 py-2 rounded-full bg-blue-500 hover:bg-blue-600 text-white disabled:bg-blue-200"
-              >
-                {uploading ? "Uploading…" : "Upload"}
-              </button>
-            </div>
-          </div>
-          {uploadMsg && (
-            <div
-              className={`text-sm rounded-md px-3 py-2 ${
-                uploadIsError ? "bg-red-50 text-red-700 border border-red-200" : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-              }`}
-            >
-              {uploadMsg}
-            </div>
-          )}
-        </section>
-
-        {/* Google Business / Maps URL */}
-        <section className="flex flex-col gap-2">
-          <h2 className="text-lg font-semibold text-gray-800">Google Business / Maps URL</h2>
-          <input
-            type="url"
-            value={googleLink}
-            onChange={(e) => setGoogleLink(e.target.value)}
-            placeholder="https://g.page/your-business or https://maps.google.com/..."
-            className={`border rounded-lg px-4 py-2 focus:outline-none ${
-              googleLink && !googleLinkIsValid ? "border-red-400 focus:ring-2 focus:ring-red-300" : "border-gray-300 focus:ring-2 focus:ring-blue-300"
+        {/* Global save status */}
+        {saveMsg && (
+          <div
+            className={`mt-4 rounded-md border px-3 py-2 text-sm ${
+              saveIsError
+                ? "border-red-200 bg-red-50 text-red-700"
+                : "border-emerald-200 bg-emerald-50 text-emerald-700"
             }`}
-          />
-          {!googleLinkIsValid && googleLink && (
-            <div className="text-sm text-red-600">That doesn’t look like a valid Google Business/Maps link.</div>
-          )}
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={handleSaveGoogle}
-              disabled={savingGoogle || (googleLink ? !googleLinkIsValid : false) || !authUserId}
-              className="px-4 py-2 rounded-full bg-blue-500 hover:bg-blue-600 text-white disabled:bg-blue-200"
-            >
-              {savingGoogle ? "Saving…" : "Save Link"}
-            </button>
-            <Link
-              href={`/${currentSlug}/dashboard`}
-              className="px-4 py-2 rounded-full border border-gray-300 hover:bg-gray-100"
-            >
-              Cancel
-            </Link>
+          >
+            {saveMsg}
           </div>
-          {googleMsg && (
-            <div
-              className={`text-sm rounded-md px-3 py-2 ${
-                googleIsError ? "bg-red-50 text-red-700 border border-red-200" : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-              }`}
-            >
-              {googleMsg}
-            </div>
-          )}
-        </section>
+        )}
 
-        {/* Dashboard URL (slug) */}
-        <section className="flex flex-col gap-2">
-          <h2 className="text-lg font-semibold text-gray-800">Dashboard URL</h2>
-          <div className="grid gap-2">
-            <label className="text-sm text-gray-700">Your unique URL slug</label>
-            <input
-              type="text"
-              value={slugInput}
-              onChange={(e) => setSlugInput(e.target.value)}
-              placeholder={currentSlug || "your-business"}
-              className="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
-            />
-            <div className="text-xs text-gray-600">
-              Your dashboard URL will be:{" "}
-              <code className="bg-gray-100 rounded px-2 py-0.5">{prettyURL}</code>
+        {/* Content sections with simple dividers */}
+        <div className="mt-6 divide-y divide-gray-200">
+          {/* Logo */}
+          <section className="py-6">
+            <h2 className="text-sm font-medium text-gray-900 mb-3">Profile Photo (Company Logo)</h2>
+            <div className="flex items-center gap-4">
+              <div className="h-14 w-14 overflow-hidden rounded-full bg-white">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={localPreview || logoUrl || "/DefaultPic.png"}
+                  alt="Company logo"
+                  className="h-full w-full object-contain p-1"
+                  onError={(e) => {
+                    if (!e.currentTarget.src.endsWith("/DefaultPic.png")) {
+                      e.currentTarget.src = "/DefaultPic.png";
+                    }
+                  }}
+                  draggable={false}
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => onPick(e.target.files?.[0] ?? undefined)}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 hover:bg-gray-50"
+                >
+                  Choose image
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUploadLogo}
+                  disabled={!file || uploading}
+                  className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {uploading ? "Uploading…" : "Upload"}
+                </button>
+              </div>
             </div>
-
-            {slugInput !== currentSlug && (
-              <div className="text-xs">
-                {checkingAvail ? (
-                  <span className="text-gray-500">Checking availability…</span>
-                ) : isAvailable === true ? (
-                  <span className="text-emerald-700">Available ✓</span>
-                ) : isAvailable === false ? (
-                  <span className="text-red-600">Already taken ✗</span>
-                ) : null}
+            {uploadMsg && (
+              <div
+                className={`mt-3 rounded-md border px-3 py-2 text-sm ${
+                  uploadIsError
+                    ? "border-red-200 bg-red-50 text-red-700"
+                    : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                }`}
+              >
+                {uploadMsg}
               </div>
             )}
-          </div>
+          </section>
 
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={handleSaveSlug}
-              disabled={slugSaving || !authUserId || !accountEmail}
-              className="px-4 py-2 rounded-full bg-blue-500 hover:bg-blue-600 text-white disabled:bg-blue-200"
-            >
-              {slugSaving ? "Saving…" : "Save URL"}
-            </button>
-            <Link
-              href={`/${currentSlug}/dashboard`}
-              className="px-4 py-2 rounded-full border border-gray-300 hover:bg-gray-100"
-            >
-              Cancel
-            </Link>
-          </div>
-
-          {slugMsg && (
-            <div
-              className={`text-sm rounded-md px-3 py-2 ${
-                slugIsError ? "bg-red-50 text-red-700 border border-red-200" : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-              }`}
-            >
-              {slugMsg}
+          {/* Description */}
+          <section className="py-6">
+            <div className="mb-2">
+              <h2 className="text-sm font-medium text-gray-900">Business Description</h2>
+              <p className="text-xs text-gray-500">Optional • Used to make generated reviews feel authentic.</p>
             </div>
-          )}
-        </section>
+            {infoLoading ? (
+              <div className="h-28 rounded-md border border-gray-200 bg-gray-50 animate-pulse" />
+            ) : (
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={5}
+                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                placeholder={"A short description of what you do.\nWe will use this to make generated reviews more authentic."}
+              />
+            )}
+          </section>
 
-        {/* Back to dashboard */}
-        <div className="flex justify-center pt-2">
-          <Link
-            href={`/${currentSlug}/dashboard`}
-            className="bg-blue-500 text-white px-6 py-3 rounded-full font-semibold text-center hover:bg-blue-600 transition mt-2"
-          >
-            Done
-          </Link>
+          {/* Google Link */}
+          <section className="py-6">
+            <h2 className="mb-2 text-sm font-medium text-gray-900">Google Business / Maps URL</h2>
+            {infoLoading ? (
+              <div className="h-10 rounded-md border border-gray-200 bg-gray-50 animate-pulse" />
+            ) : (
+              <>
+                <input
+                  type="url"
+                  value={googleLink}
+                  onChange={(e) => setGoogleLink(e.target.value)}
+                  placeholder="https://g.page/your-business or https://maps.google.com/..."
+                  className={`w-full rounded-md border bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:ring-1 ${
+                    googleLink && !googleLinkIsValid
+                      ? "border-red-400 focus:border-red-500 focus:ring-red-500"
+                      : "border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                  }`}
+                />
+                {!googleLinkIsValid && googleLink && (
+                  <div className="mt-2 text-xs text-red-600">
+                    That doesn’t look like a valid Google Business/Maps link.
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+
+          {/* Dashboard URL */}
+          <section className="py-6">
+            <h2 className="mb-2 text-sm font-medium text-gray-900">Dashboard URL</h2>
+            <div className="grid gap-2">
+              <label className="text-xs text-gray-600">Your unique URL slug</label>
+              <input
+                type="text"
+                value={slugInput}
+                onChange={(e) => setSlugInput(e.target.value)}
+                placeholder={currentSlug || "your-business"}
+                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              />
+              <div className="text-xs text-gray-600">
+                Your dashboard URL will be:{" "}
+                <code className="rounded bg-gray-100 px-1.5 py-0.5">{prettyURL}</code>
+              </div>
+
+              {slugInput !== currentSlug && (
+                <div className="text-xs">
+                  {checkingAvail ? (
+                    <span className="text-gray-500">Checking availability…</span>
+                  ) : isAvailable === true ? (
+                    <span className="text-emerald-700">Available ✓</span>
+                  ) : isAvailable === false ? (
+                    <span className="text-red-600">Already taken ✗</span>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          </section>
         </div>
-      </div>
+      </main>
+    </div>
   );
 }

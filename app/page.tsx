@@ -37,7 +37,7 @@ export default function Home() {
             Log In
           </Link>
           <Link
-            href="/choose-plan"
+            href="/sign-up"
             className="w-full sm:w-auto border border-gray-300 rounded-full px-6 py-3 font-medium hover:bg-gray-100 transition"
           >
             Sign Up

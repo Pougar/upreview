@@ -1,89 +1,57 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "../UserContext";
 import { authClient } from "@/app/lib/auth-client";
-import { useLogoUrl } from "@/app/lib/logoUrlClient";
+import ReviewsGraph from "@/app/ui/dashboard/ReviewsGraph";
+import TutorialPanel from "@/app/ui/dashboard/TutorialPanel";
 
 /* ---------------- Types ---------------- */
-
-type Counts = {
-  good: number;
-  bad: number;
-  not_reviewed_yet: number;
-};
-
 type RecentReview = {
-  client_id: string;
-  client_name: string;
-  sentiment: "good" | "bad" | "unreviewed" | string;
+  review_id: string;
+  client_id: string | null;
+  client_name: string | null;
+  is_primary: "google" | "internal";
+  sentiment: boolean | null;
+  stars: number | null;
   review: string;
-  updated_at: string; // ISO
+  created_at: string | null;
+  updated_at: string | null;
 };
-
-/* ---------------- Page ---------------- */
 
 export default function DashboardPage() {
-  const router = useRouter();
-
-  // Provided by your layout’s <UserProvider />
   const { name, display } = useUser();
-
-  // Keep hook order stable: session hook early
   const { data: session } = authClient.useSession();
   const userId = session?.user?.id ?? null;
 
-  // Logo (signed URL with auto-refresh; falls back if missing)
-  const { url: logoUrl } = useLogoUrl();
+  // Tutorial modal state (always available via bottom button)
+  const [showTutorial, setShowTutorial] = useState(false);
 
-  /* ----- Statistics (Good/Bad/Unreviewed) ----- */
-  const [counts, setCounts] = useState<Counts | null>(null);
-  const [loadingCounts, setLoadingCounts] = useState(true);
+  // Banner state: hide when user is >= 1 week old
+  const [hideTutorialBanner, setHideTutorialBanner] = useState(true);
+  const bannerVisible = !hideTutorialBanner;
 
-  /* ----- Email template preview ----- */
-  const [subject, setSubject] = useState("");
-  const [body, setBody] = useState("");
-  const [senderName, setSenderName] = useState(display || "");
-  const [loadingTpl, setLoadingTpl] = useState(true);
-
-  /* ----- Recent reviews (5 per page from up to latest 10) ----- */
-  const [recent, setRecent] = useState<RecentReview[]>([]);
-  const [rvLoading, setRvLoading] = useState(true);
-  const [rvErr, setRvErr] = useState<string | null>(null);
-  const [page, setPage] = useState(0);
-  const pageSize = 5;
-  const totalPages = Math.max(1, Math.ceil(recent.length / pageSize));
-  const visible = useMemo(
-    () => recent.slice(page * pageSize, page * pageSize + pageSize),
-    [recent, page]
-  );
-
-  const total = useMemo(
-    () => (counts ? counts.good + counts.bad + counts.not_reviewed_yet : 0),
-    [counts]
-  );
-
-
-  /* ----- Fetch stats (wait for Xero sync) ----- */
+  // Check account age (API returns true => old user => hide banner; false => show)
   useEffect(() => {
+    if (!userId) return;
     let alive = true;
     (async () => {
-      setLoadingCounts(true);
       try {
-        const res = await fetch("/api/statistics", {
+        const res = await fetch("/api/dashboard/check-new-user", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId }),
+          body: JSON.stringify({ user_id: userId }),
+          cache: "no-store",
         });
-        if (!res.ok) throw new Error(`Statistics fetch failed: ${res.status}`);
-        const data = await res.json();
-        if (alive) setCounts(data ?? { good: 0, bad: 0, not_reviewed_yet: 0 });
+        const data = await res.json().catch(() => ({}));
+        // Accept multiple shapes of responses
+        let isOld = true;
+        if (typeof data?.older_than_week === "boolean") {
+          isOld = data.older_than_week;
+        }
+        if (alive) setHideTutorialBanner(isOld);
       } catch {
-        if (alive) setCounts({ good: 0, bad: 0, not_reviewed_yet: 0 });
-      } finally {
-        if (alive) setLoadingCounts(false);
+        if (alive) setHideTutorialBanner(true);
       }
     })();
     return () => {
@@ -91,39 +59,21 @@ export default function DashboardPage() {
     };
   }, [userId]);
 
-  /* ----- Fetch email template (wait for Xero sync) ----- */
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      setLoadingTpl(true);
-      try {
-        const res = await fetch("/api/email-template", {
-          method: "GET",
-          cache: "no-store",
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!alive) return;
-        setSubject(data?.subject ?? "");
-        setBody(data?.body ?? "");
-        setSenderName(data?.senderName ?? display ?? "");
-      } catch {
-        if (alive) {
-          setSubject("");
-          setBody("");
-          setSenderName(display ?? "");
-        }
-      } finally {
-        if (alive) setLoadingTpl(false);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [display]);
+  /* ----- Recent reviews (4 per page) ----- */
+  const [recent, setRecent] = useState<RecentReview[]>([]);
+  const [rvLoading, setRvLoading] = useState(true);
+  const [rvErr, setRvErr] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const pageSize = 4;
+  const totalPages = Math.max(1, Math.ceil(recent.length / pageSize));
+  const visible = useMemo(
+    () => recent.slice(page * pageSize, page * pageSize + pageSize),
+    [recent, page]
+  );
 
-  /* ----- Fetch recent reviews (wait for Xero sync & userId) ----- */
+  /* ----- Fetch recent reviews ----- */
   useEffect(() => {
-    if (!userId) return; // gate
+    if (!userId) return;
     let alive = true;
     (async () => {
       setRvLoading(true);
@@ -136,7 +86,23 @@ export default function DashboardPage() {
         });
         if (!res.ok) throw new Error(`Failed to load reviews (${res.status})`);
         const data = await res.json().catch(() => ({}));
-        const list: RecentReview[] = data?.reviews ?? [];
+
+        const list: RecentReview[] = Array.isArray(data?.reviews)
+          ? data.reviews.map((r: any): RecentReview => ({
+              review_id: String(r.review_id ?? ""),
+              client_id: r.client_id ?? null,
+              client_name: typeof r.client_name === "string" ? r.client_name : null,
+              is_primary: (r.is_primary === "google" ? "google" : "internal") as
+                | "google"
+                | "internal",
+              sentiment: typeof r.sentiment === "boolean" ? r.sentiment : null,
+              stars: Number.isFinite(r.stars) ? Number(r.stars) : null,
+              review: String(r.review ?? ""),
+              created_at: r.created_at ?? null,
+              updated_at: r.updated_at ?? null,
+            }))
+          : [];
+
         if (alive) {
           setRecent(list);
           setPage(0);
@@ -153,164 +119,144 @@ export default function DashboardPage() {
   }, [userId]);
 
   return (
-    <div className="rounded-2xl min-h-screen flex flex-col items-center">
-      {/* Logo (kept minimal; no hero) */}
-      <div className="w-32 mb-8">
-        <img
-          src={logoUrl ?? "/snakepic.png"}
-          alt={display ? `${display} Logo` : "Company Logo"}
-          className="w-full h-full object-cover rounded-xl ring-1 ring-black/5"
-          onError={(e) => {
-            e.currentTarget.src = "/snakepic.png";
-          }}
-        />
-      </div>
-
-      {/* Analytics */}
-      <section className="w-full max-w-5xl">
-        <h2 className="mb-4 text-xl font-semibold text-gray-800 text-center">
-          Your Review Analytics
-        </h2>
-        <p className="mb-8 text-sm text-gray-600 text-center">
-          A quick breakdown of your recent feedback.
-        </p>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <AnalyticsCard
-            title="Good"
-            count={counts?.good ?? 0}
-            total={total}
-            loading={loadingCounts}
-            barClass="bg-green-500"
-            badgeClass="bg-green-100 text-green-800 ring-green-200"
-            onClick={() => router.push(`/${name}/dashboard/statistics`)}
-          />
-          <AnalyticsCard
-            title="Bad"
-            count={counts?.bad ?? 0}
-            total={total}
-            loading={loadingCounts}
-            barClass="bg-red-500"
-            badgeClass="bg-red-100 text-red-800 ring-red-200"
-            onClick={() => router.push(`/${name}/dashboard/statistics`)}
-          />
-          <AnalyticsCard
-            title="Unreviewed"
-            count={counts?.not_reviewed_yet ?? 0}
-            total={total}
-            loading={loadingCounts}
-            barClass="bg-gray-500"
-            badgeClass="bg-gray-100 text-gray-800 ring-gray-200"
-            onClick={() => router.push(`/${name}/dashboard/statistics`)}
-          />
-        </div>
-      </section>
-
-      {/* Recent Reviews */}
-      <section className="mt-16 w-full max-w-5xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-800">Recent Reviews</h2>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={rvLoading || page === 0}
-              className="rounded-lg border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-              aria-label="Previous"
-            >
-              ←
-            </button>
-            <span className="text-sm text-gray-500">
-              Page {Math.min(page + 1, totalPages)} / {totalPages}
-            </span>
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-              disabled={rvLoading || page >= totalPages - 1}
-              className="rounded-lg border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-              aria-label="Next"
-            >
-              →
-            </button>
-          </div>
-        </div>
-
-        {rvLoading ? (
-          <RecentReviewsSkeleton />
-        ) : rvErr ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {rvErr}
-          </div>
-        ) : recent.length === 0 ? (
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
-            No recent reviews yet.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            {visible.map((r) => (
-              <RecentReviewCard key={r.client_id + r.updated_at} review={r} />
-            ))}
+    <div className="min-h-screen">
+      <main className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8 py-5">
+        {/* -------- Inline Tutorial Banner (white card, above graph) -------- */}
+        {bannerVisible && (
+          <div className="mb-6">
+            <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-sm">
+              <div>
+                <span className="font-medium">Looks like your account is not even a week old!</span>{" "}
+                Click the tutorial to get an introduction to Upreview.
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTutorial(true)}
+                className="inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              >
+                Open Tutorial
+              </button>
+            </div>
           </div>
         )}
-      </section>
+
+        {/* -------------------------------- Graph -------------------------------- */}
+        <section className="mb-4">
+          <h2 className="text-lg font-semibold tracking-tight text-gray-900 text-center">
+            {display} Monthly Reviews
+          </h2>
+          <div className="mt-6">
+            <ReviewsGraph userId={userId} months={12} />
+          </div>
+        </section>
+
+        {/* Divider */}
+        <div className="my-8 h-px w-full bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
+
+        {/* -------------------------------- Recent Reviews -------------------------------- */}
+        <section aria-labelledby="recent-heading" className="mb-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 id="recent-heading" className="text-lg font-semibold tracking-tight text-gray-900">
+              Recent reviews
+            </h2>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={rvLoading || page === 0}
+                className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                aria-label="Previous page"
+              >
+                ←
+              </button>
+              <span className="select-none text-sm text-gray-500">
+                Page {Math.min(page + 1, totalPages)} / {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                disabled={rvLoading || page >= totalPages - 1}
+                className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                aria-label="Next page"
+              >
+                →
+              </button>
+            </div>
+          </div>
+
+          {rvLoading ? (
+            <RecentReviewsSkeleton />
+          ) : rvErr ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              {rvErr}
+            </div>
+          ) : recent.length === 0 ? (
+            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+              No recent reviews yet.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {visible.map((r) => (
+                <RecentReviewCard key={r.review_id} review={r} />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* -------- Persistent Tutorial Button (always visible) -------- */}
+        <div className="mt-8 flex justify-end">
+          <button
+            type="button"
+            onClick={() => setShowTutorial(true)}
+            className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          >
+            Open Tutorial
+          </button>
+        </div>
+      </main>
+
+      {/* ---------------- Tutorial Modal ---------------- */}
+      {showTutorial && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Upreview Tutorial"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setShowTutorial(false);
+          }}
+        >
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowTutorial(false)} />
+          <div className="relative z-10 w-full max-w-5xl rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/10">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Welcome to Upreview</h2>
+              <button
+                type="button"
+                onClick={() => setShowTutorial(false)}
+                className="rounded-md px-2 py-1 text-sm text-gray-600 hover:bg-gray-100"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <TutorialPanel username={name} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-/* ---------------- Small UI helpers ---------------- */
-
-function AnalyticsCard({
-  title,
-  count,
-  total,
-  loading,
-  barClass,
-  badgeClass,
-  onClick,
-}: {
-  title: string;
-  count: number;
-  total: number;
-  loading: boolean;
-  barClass: string;
-  badgeClass: string;
-  onClick?: () => void;
-}) {
-  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group rounded-2xl border border-gray-200 bg-white p-5 text-left shadow-sm transition hover:shadow-lg"
-    >
-      <div className="mb-2 flex items-center justify-between">
-        <div className="text-sm font-semibold text-gray-800">{title}</div>
-        <span className={`rounded-full px-2 py-1 text-xs font-medium ring-1 ${badgeClass}`}>
-          {count} / {total}
-        </span>
-      </div>
-      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-100">
-        {loading ? (
-          <div className="h-2 w-1/2 animate-pulse bg-gray-200" />
-        ) : (
-          <div
-            className={`h-2 ${barClass}`}
-            style={{ width: `${pct}%`, transition: "width 300ms ease" }}
-          />
-        )}
-      </div>
-      {!loading && <div className="mt-2 text-xs text-gray-500">{pct}%</div>}
-    </button>
-  );
-}
-
+/* ---------------- Helpers ---------------- */
 function RecentReviewsSkeleton() {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="rounded-2xl border border-gray-200 p-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div
+          key={i}
+          className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm ring-1 ring-black/5"
+        >
           <div className="mb-2 h-4 w-2/3 rounded bg-gray-200" />
           <div className="mb-1 h-3 w-1/3 rounded bg-gray-200" />
           <div className="h-20 w-full rounded bg-gray-200" />
@@ -320,15 +266,25 @@ function RecentReviewsSkeleton() {
   );
 }
 
-function SentimentChip({ v }: { v: string }) {
-  const s = (v || "").toLowerCase();
+function SentimentChip({ v }: { v?: string | boolean | null }) {
+  const s =
+    typeof v === "string"
+      ? v.trim().toLowerCase()
+      : v === true
+      ? "good"
+      : v === false
+      ? "bad"
+      : "unreviewed";
+
   const styles =
     s === "good"
-      ? "bg-green-100 text-green-800 ring-green-200"
+      ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
       : s === "bad"
-      ? "bg-red-100 text-red-800 ring-red-200"
-      : "bg-gray-100 text-gray-700 ring-gray-200";
+      ? "bg-rose-50 text-rose-700 ring-rose-200"
+      : "bg-gray-50 text-gray-700 ring-gray-200";
+
   const label = s === "good" ? "Good" : s === "bad" ? "Bad" : "Unreviewed";
+
   return (
     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${styles}`}>
       {label}
@@ -336,17 +292,51 @@ function SentimentChip({ v }: { v: string }) {
   );
 }
 
-function RecentReviewCard({ review }: { review: RecentReview }) {
-  const dateFmt = new Date(review.updated_at).toLocaleDateString();
+function SourceBadge({ source }: { source: "google" | "internal" }) {
+  const isGoogle = source === "google";
+  const styles = isGoogle
+    ? "bg-blue-50 text-blue-700 ring-blue-200"
+    : "bg-gray-50 text-gray-700 ring-gray-200";
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ${styles}`}>
+      {isGoogle ? "Google" : "Internal"}
+    </span>
+  );
+}
+
+function Stars({ value }: { value: number | null }) {
+  if (value == null) return null;
+  const full = Math.max(0, Math.min(5, Math.round(value)));
+  return (
+    <span aria-label={`${full} stars`} className="text-xs text-yellow-600">
+      {"★".repeat(full)}
+      {"☆".repeat(5 - full)}
+    </span>
+  );
+}
+
+function RecentReviewCard({ review }: { review: RecentReview }) {
+  const dt = review.updated_at ?? review.created_at;
+  const dateFmt = dt ? new Date(dt).toLocaleDateString() : "";
+  const title =
+    review.client_name ??
+    (review.is_primary === "google" ? "Google review" : "Internal review");
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm ring-1 ring-black/5 transition hover:shadow-md">
       <div className="mb-1 flex items-center justify-between gap-2">
-        <div className="truncate text-sm font-semibold text-gray-800" title={review.client_name}>
-          {review.client_name}
+        <div className="truncate text-sm font-medium text-gray-900" title={title}>
+          {title}
         </div>
-        <SentimentChip v={review.sentiment} />
+        <div className="flex items-center gap-1">
+          <SourceBadge source={review.is_primary} />
+          {review.sentiment !== null && <SentimentChip v={review.sentiment} />}
+        </div>
       </div>
-      <div className="mb-2 text-xs text-gray-500">{dateFmt}</div>
+      <div className="mb-2 flex items-center justify-between text-xs text-gray-500">
+        <span>{dateFmt}</span>
+        <Stars value={review.stars} />
+      </div>
       <p
         className="text-sm text-gray-800"
         style={{

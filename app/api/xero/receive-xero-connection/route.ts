@@ -201,8 +201,27 @@ export async function GET(req: NextRequest) {
       if (makePrimary) hasPrimary = true;
     }
 
+    // NEW: record xero_connected in user_actions (idempotent; non-fatal if it fails)
+    try {
+      await pool.query(
+        `
+        INSERT INTO user_actions (user_id, action)
+        SELECT $1, 'xero_connected'
+        WHERE NOT EXISTS (
+          SELECT 1 FROM user_actions WHERE user_id = $1 AND action = 'xero_connected'
+        )
+        `,
+        [betterauthId]
+      );
+    } catch (e) {
+      console.warn("[xero_connected] failed to record user action (continuing):", e);
+    }
+
     // Success: clear the nonce cookie and redirect to the welcome page
-    const res = NextResponse.redirect(new URL(`/welcome?userID=${encodeURIComponent(betterauthId)}`, origin).toString(), 302);
+    const res = NextResponse.redirect(
+      new URL(`/onboarding-flow/welcome?userID=${encodeURIComponent(betterauthId)}`, origin).toString(),
+      302
+    );
     res.cookies.set({
       name: NONCE_COOKIE,
       value: "",

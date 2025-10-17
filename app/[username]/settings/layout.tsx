@@ -7,7 +7,7 @@ export default function SettingsLayout({
   children: ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+    <div>
       {/* Full-width, left-anchored grid */}
       <div className="grid grid-cols-[220px_minmax(0,1fr)] gap-6 p-6">
         <div className="justify-self-start">

@@ -9,16 +9,14 @@ export const dynamic = "force-dynamic";
 const XERO_TOKEN_URL = "https://identity.xero.com/connect/token";
 const XERO_INVOICES_URL = "https://api.xero.com/api.xro/2.0/Invoices";
 const XERO_CONTACTS_URL = "https://api.xero.com/api.xro/2.0/Contacts";
-const INVOICE_SINCE_WHERE = "Date >= DateTime(2025, 1, 1)"; // legacy default (kept for compatibility)
+const INVOICE_SINCE_WHERE = "Date >= DateTime(2025, 1, 1)";
 
-// --- DB pool (reuse in dev) ---
-const pool =
-  (globalThis as any).__pgPool ??
-  new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: true } : undefined,
-  });
-(globalThis as any).__pgPool = pool;
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: true },
+});
+
+/* ---------------- Xero types (minimal fields used) ---------------- */
 
 type XeroTokenResponse = {
   access_token: string;
@@ -30,7 +28,7 @@ type XeroTokenResponse = {
 };
 
 type XeroContactPhone = {
-  PhoneType?: string; // "DEFAULT" | "MOBILE" | "DDI" | "FAX"
+  PhoneType?: "DEFAULT" | "MOBILE" | "DDI" | "FAX" | string;
   PhoneNumber?: string | null;
   PhoneAreaCode?: string | null;
   PhoneCountryCode?: string | null;
@@ -41,16 +39,27 @@ type XeroContact = {
   Name?: string;
   EmailAddress?: string | null;
   Phones?: XeroContactPhone[] | null;
+  /** <<< New: we only upsert when this is true */
+  IsCustomer?: boolean | null;
 };
+
+type XeroLineItem = { Description?: string | null };
 
 type XeroInvoice = {
   InvoiceID?: string;
   Contact?: { ContactID?: string; Name?: string } | null;
   Date?: string;
+  LineItems?: XeroLineItem[] | null;
+  SentToContact?: boolean | null;
+  Status?: string | null;
 };
 
 type XeroInvoicesResponse = { Invoices?: XeroInvoice[] };
 type XeroContactsResponse = { Contacts?: XeroContact[] };
+
+/* ---------------- local types & utils ---------------- */
+
+type InvoiceStatus = "PAID" | "SENT" | "DRAFT" | "PAID BUT NOT SENT";
 
 function requireEnv(name: string): string {
   const v = process.env[name];
@@ -80,29 +89,42 @@ function pickPhone(phones?: XeroContactPhone[] | null): string | null {
   return null;
 }
 
+function computeInvoiceStatus(sentToContact?: boolean | null, status?: string | null): InvoiceStatus {
+  const isPaid = (status || "").toUpperCase() === "PAID";
+  const sent = !!sentToContact;
+  if (isPaid) return sent ? "PAID" : "PAID BUT NOT SENT";
+  return sent ? "SENT" : "DRAFT";
+}
+
 /** Upsert by Xero ContactID (unique on (user_id, xero_contact_id)) */
 async function upsertClientByContactId(
   userId: string,
   xeroContactId: string,
   nameIn: string,
   emailIn: string | null,
-  phoneIn: string | null
+  phoneIn: string | null,
+  itemDescriptionIn: string | null,
+  invoiceStatusIn: InvoiceStatus | null
 ): Promise<"inserted" | "updated"> {
   const name = (nameIn || "").trim() || "(Unknown Contact)";
   const email = (emailIn || "")?.trim() || null;
   const phone = (phoneIn || "")?.trim() || null;
+  const itemDesc = (itemDescriptionIn || "").trim() || null;
+  const invoiceStatus = invoiceStatusIn ?? null;
   const clientId = crypto.randomUUID();
 
   const q = `
     INSERT INTO public.clients
-      (id, user_id, xero_contact_id, name, email, phone_number, sentiment, email_sent, review_clicked, review_submitted)
+      (id, user_id, xero_contact_id, name, email, phone_number, item_description, invoice_status, sentiment, email_sent, review_clicked, review_submitted)
     VALUES
-      ($1, $2, $3::uuid, $4, $5, $6, 'unreviewed', FALSE, FALSE, FALSE)
+      ($1, $2, $3::uuid, $4, $5, $6, $7, $8::public.invoice_status, 'unreviewed', FALSE, FALSE, FALSE)
     ON CONFLICT ON CONSTRAINT uq_clients_user_xero_contact
     DO UPDATE SET
-      name         = COALESCE(NULLIF(EXCLUDED.name, ''), public.clients.name),
-      email        = COALESCE(EXCLUDED.email, public.clients.email),
-      phone_number = COALESCE(NULLIF(EXCLUDED.phone_number, ''), public.clients.phone_number)
+      name             = COALESCE(NULLIF(EXCLUDED.name, ''), public.clients.name),
+      email            = COALESCE(EXCLUDED.email, public.clients.email),
+      phone_number     = COALESCE(NULLIF(EXCLUDED.phone_number, ''), public.clients.phone_number),
+      item_description = COALESCE(NULLIF(EXCLUDED.item_description, ''), public.clients.item_description),
+      invoice_status   = COALESCE(EXCLUDED.invoice_status, public.clients.invoice_status)
     RETURNING (xmax = 0) AS inserted
   `;
 
@@ -113,6 +135,8 @@ async function upsertClientByContactId(
     name,
     email,
     phone,
+    itemDesc,
+    invoiceStatus,
   ]);
   return result.rows[0]?.inserted ? "inserted" : "updated";
 }
@@ -140,13 +164,11 @@ async function refreshAccessToken(refresh_token: string): Promise<XeroTokenRespo
 
 /** Build Xero 'where' clause Date >= DateTime(Y, M, D) from an ISO date (YYYY-MM-DD). */
 function buildSinceWhere(isoDate: string): { where: string; sinceISO: string } {
-  // fallback to legacy
   if (!isoDate) return { where: INVOICE_SINCE_WHERE, sinceISO: "2025-01-01" };
   const d = new Date(isoDate);
   if (Number.isNaN(d.getTime())) {
     throw new Error("Invalid since date. Use ISO format like 2025-01-01.");
   }
-  // Use UTC parts to avoid TZ skew
   const y = d.getUTCFullYear();
   const m = d.getUTCMonth() + 1;
   const day = d.getUTCDate();
@@ -154,14 +176,20 @@ function buildSinceWhere(isoDate: string): { where: string; sinceISO: string } {
   return { where: `Date >= DateTime(${y}, ${m}, ${day})`, sinceISO };
 }
 
-/** Fetch invoices (paged) and collect unique ContactIDs + fallback names */
-async function collectInvoiceContactIds(
+/**
+ * Fetch invoices (paged) and collect per-contact info
+ * (we still use invoices to discover active contacts & descriptions).
+ */
+async function collectInvoiceContactData(
   accessToken: string,
   tenantId: string,
   sinceWhere: string
 ) {
   const uniqueIds = new Set<string>();
-  const fallbackNames = new Map<string, string>(); // ContactID -> Name (from invoice summary)
+  const fallbackNames = new Map<string, string>();
+  const descSets = new Map<string, Set<string>>();
+  const latestByContact = new Map<string, { ts: number; sent?: boolean | null; status?: string | null }>();
+
   let page = 1;
   const maxPages = 50;
 
@@ -177,6 +205,7 @@ async function collectInvoiceContactIds(
         Accept: "application/json",
       },
     });
+    // NOTE: We *don't* set summaryOnly=true because we need LineItems
   };
 
   while (page <= maxPages) {
@@ -192,18 +221,52 @@ async function collectInvoiceContactIds(
     for (const inv of list) {
       const c = inv.Contact;
       const id = (c?.ContactID || "").trim();
-      if (id) {
-        uniqueIds.add(id);
-        if (c?.Name) fallbackNames.set(id, c.Name);
+      if (!id) continue;
+
+      uniqueIds.add(id);
+      if (c?.Name) fallbackNames.set(id, c.Name);
+
+      const items = inv.LineItems ?? [];
+      if (Array.isArray(items) && items.length) {
+        let set = descSets.get(id);
+        if (!set) {
+          set = new Set<string>();
+          descSets.set(id, set);
+        }
+        for (const li of items) {
+          const d = (li?.Description || "").toString().trim();
+          if (d) set.add(d);
+        }
+      }
+
+      const ts = Date.parse(inv.Date ?? "") || 0;
+      const prev = latestByContact.get(id);
+      if (!prev || ts >= prev.ts) {
+        latestByContact.set(id, { ts, sent: inv.SentToContact ?? null, status: inv.Status ?? null });
       }
     }
     page += 1;
   }
 
-  return { ids: Array.from(uniqueIds), names: fallbackNames };
+  const descriptions = new Map<string, string>();
+  for (const [id, set] of descSets) {
+    descriptions.set(id, Array.from(set).join(" | "));
+  }
+
+  const statusByContact = new Map<string, InvoiceStatus>();
+  for (const [id, info] of latestByContact) {
+    statusByContact.set(id, computeInvoiceStatus(info.sent, info.status));
+  }
+
+  return {
+    ids: Array.from(uniqueIds),
+    names: fallbackNames,
+    descriptions,
+    statusByContact,
+  };
 }
 
-/** Fetch contacts in batches using the Contacts endpoint with IDs=<csv> (100 per call) */
+/** Fetch contacts in batches using Contacts?IDs=... (100 per call) */
 async function fetchContactsByIds(
   accessToken: string,
   tenantId: string,
@@ -213,10 +276,6 @@ async function fetchContactsByIds(
   const all: XeroContact[] = [];
   for (let i = 0; i < ids.length; i += batchSize) {
     const slice = ids.slice(i, i + batchSize);
-    // Build query as .../Contacts?IDs=<id1>,<id2>,...
-    const qs = new URLSearchParams();
-    // NOTE: Xero expects a comma-separated list in a single IDs param.
-    // URLSearchParams encodes commas, so build manually:
     const url = `${XERO_CONTACTS_URL}?IDs=${slice.map(encodeURIComponent).join(",")}`;
 
     const resp = await fetch(url, {
@@ -245,7 +304,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing userId" }, { status: 400 });
     }
 
-    // NEW: since date handling (supports { since } or { date })
+    // Since-date handling
     let sinceWhere = INVOICE_SINCE_WHERE;
     let sinceISO = "2025-01-01";
     try {
@@ -311,52 +370,109 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3) Fetch invoices (summary contacts) and collect unique ContactIDs
-    const { ids: contactIds, names: invoiceNameFallbacks } = await collectInvoiceContactIds(
-      access_token,
-      tenantId,
-      sinceWhere
-    );
+    // 3) Discover contacts via invoices (IDs, fallbacks, descriptions, latest invoice status)
+    const {
+      ids: contactIds,
+      names: invoiceNameFallbacks,
+      descriptions: invoiceDescriptions,
+      statusByContact,
+    } = await collectInvoiceContactData(access_token, tenantId, sinceWhere);
 
     if (contactIds.length === 0) {
       return NextResponse.json(
-        { userId, tenantId, since: sinceISO, inserted: 0, updated: 0, totalClientsForUser: 0, notes: "No contacts from invoices." },
+        {
+          userId,
+          tenantId,
+          since: sinceISO,
+          inserted: 0,
+          updated: 0,
+          consideredFromInvoices: 0,
+          customersOnly: 0,
+          totalClientsForUser: 0,
+          notes: "No contacts from invoices.",
+        },
         { status: 200 }
       );
     }
 
-    // 4) Fetch full contacts in batches via Contacts?IDs=...
+    // 4) Fetch full contact objects for those IDs
     const contacts = await fetchContactsByIds(access_token, tenantId, contactIds);
 
-    // Build a map for quick lookup; some IDs may not be returned (archived/permissions/etc.)
+    // Build map and a set of .IsCustomer === true
     const contactMap = new Map<string, XeroContact>();
+    const customerSet = new Set<string>();
     for (const c of contacts) {
       const id = (c.ContactID || "").trim();
-      if (id) contactMap.set(id, c);
+      if (!id) continue;
+      contactMap.set(id, c);
+      if (c.IsCustomer === true) customerSet.add(id);
     }
 
-    // 5) Upsert each unique contact
+    // 5) Upsert ONLY contacts where IsCustomer === true.
     let inserted = 0;
     let updated = 0;
-    const errors: Array<{ contactId: string; name?: string | null; email?: string | null; phone?: string | null; error: string }> = [];
-    const missingFromContacts: string[] = [];
+
+    // Metrics for visibility
+    let consideredFromInvoices = contactIds.length;   // all contact ids seen in invoices
+    let customersOnly = 0;                            // how many actually had IsCustomer true
+    const skippedNotCustomer: string[] = [];
+    const skippedMissingContact: string[] = [];
+    const errors: Array<{
+      contactId: string;
+      name?: string | null;
+      email?: string | null;
+      phone?: string | null;
+      item_description?: string | null;
+      invoice_status?: InvoiceStatus | null;
+      error: string;
+    }> = [];
 
     for (const id of contactIds) {
       const full = contactMap.get(id);
+
+      // If we don't have a full contact (not returned by Contacts), skip — can't verify IsCustomer
       if (!full) {
-        // not returned by Contacts call; keep fallback name and insert with null email/phone
-        missingFromContacts.push(id);
+        skippedMissingContact.push(id);
+        continue;
       }
-      const name = (full?.Name || invoiceNameFallbacks.get(id) || "").trim() || "(Unknown Contact)";
+
+      // Only proceed if IsCustomer is true
+      if (full.IsCustomer !== true) {
+        skippedNotCustomer.push(id);
+        continue;
+      }
+      customersOnly += 1;
+
+      // Prepare data
+      const name =
+        (full?.Name || invoiceNameFallbacks.get(id) || "").trim() || "(Unknown Contact)";
       const email = (full?.EmailAddress || null)?.toString() ?? null;
       const phone = pickPhone(full?.Phones) || null;
+      const itemDescription = invoiceDescriptions.get(id) || null;
+      const invoiceStatus = statusByContact.get(id) ?? null;
 
       try {
-        const res = await upsertClientByContactId(userId, id, name, email, phone);
+        const res = await upsertClientByContactId(
+          userId,
+          id,
+          name,
+          email,
+          phone,
+          itemDescription,
+          invoiceStatus
+        );
         if (res === "inserted") inserted += 1;
         else updated += 1;
       } catch (e: any) {
-        errors.push({ contactId: id, name, email, phone, error: e?.message || "DB upsert failed" });
+        errors.push({
+          contactId: id,
+          name,
+          email,
+          phone,
+          item_description: itemDescription,
+          invoice_status: invoiceStatus,
+          error: e?.message || "DB upsert failed",
+        });
       }
     }
 
@@ -372,12 +488,17 @@ export async function POST(req: NextRequest) {
         userId,
         tenantId,
         since: sinceISO,
-        uniqueContactsFromInvoices: contactIds.length,
+        consideredFromInvoices,
         contactsFetched: contacts.length,
-        missingFromContacts: missingFromContacts.slice(0, 20),
+        customersOnly, // how many had IsCustomer === true
         inserted,
         updated,
+        skippedNotCustomer: skippedNotCustomer.slice(0, 50),
+        skippedMissingContact: skippedMissingContact.slice(0, 50),
         totalClientsForUser: total,
+        // some debug samples
+        sampleDescriptions: Array.from(invoiceDescriptions.entries()).slice(0, 5),
+        sampleStatuses: Array.from(statusByContact.entries()).slice(0, 10),
         errors: errors.slice(0, 20),
       },
       { status: 200 }
